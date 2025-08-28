@@ -1,5 +1,7 @@
 // pages/index.js
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { 
   Users, 
@@ -30,10 +32,205 @@ export default function AdminDashboard() {
   const [showUserModal, setShowUserModal] = useState(false);
   const [error, setError] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isClient, setIsClient] = useState(false);
   const router = useRouter();
+
+  // Client-side hydration check
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // Google Translate initialization
+  useEffect(() => {
+    if (!isClient) return; // Only run on client side
+    
+    const script = document.createElement("script");
+    script.src =
+      "//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+    script.async = true;
+    document.body.appendChild(script);
+
+    window.googleTranslateElementInit = function () {
+      new window.google.translate.TranslateElement(
+        {
+          pageLanguage: "en",
+          includedLanguages: "en,ta,hi,te,kn,ml,bn,gu,mr,or,ur",
+          layout: window.google.translate.TranslateElement.InlineLayout.HORIZONTAL,
+          autoDisplay: false,
+          multilanguagePage: true,
+        },
+        "google_translate_element"
+      );
+
+      // Hide banner
+      setTimeout(hideBanner, 500);
+      setTimeout(hideBanner, 1500);
+      
+      // Add click functionality to custom button (desktop)
+      setTimeout(() => {
+        const customBtn = document.querySelector('.custom-translate-btn');
+        const googleSelect = document.querySelector('.goog-te-combo');
+        const translateContainer = document.querySelector('.translate-micro');
+        
+        if (customBtn && googleSelect && translateContainer) {
+          let isOpen = false;
+          
+          customBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            if (!isOpen) {
+              translateContainer.classList.add('open');
+              googleSelect.style.display = 'block';
+              googleSelect.focus();
+              googleSelect.click();
+              isOpen = true;
+            }
+          });
+          
+          // Close dropdown when clicking outside
+          document.addEventListener('click', (e) => {
+            if (!translateContainer.contains(e.target)) {
+              translateContainer.classList.remove('open');
+              isOpen = false;
+            }
+          });
+          
+          // Handle dropdown change
+          googleSelect.addEventListener('change', () => {
+            translateContainer.classList.remove('open');
+            isOpen = false;
+          });
+        }
+
+        // Add click functionality for mobile translate button
+        const mobileTranslateBtn = document.querySelector('.mobile-translate-btn');
+        if (mobileTranslateBtn) {
+          let customDropdown = null;
+          
+          mobileTranslateBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const googleSelect = document.querySelector('.goog-te-combo');
+            
+            if (googleSelect) {
+              // Check if dropdown already exists and remove it safely
+              if (customDropdown && customDropdown.parentNode) {
+                customDropdown.remove();
+                customDropdown = null;
+                return;
+              } else if (customDropdown) {
+                // Reset if dropdown reference exists but not in DOM
+                customDropdown = null;
+              }
+              
+              const rect = mobileTranslateBtn.getBoundingClientRect();
+              
+              customDropdown = document.createElement('div');
+              customDropdown.className = 'custom-mobile-dropdown';
+              customDropdown.style.cssText = `
+                position: fixed;
+                top: ${rect.bottom + 8}px;
+                right: ${window.innerWidth - rect.right}px;
+                z-index: 9999;
+                background: white;
+                border: 2px solid #004e16;
+                border-radius: 12px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                padding: 8px 0;
+                min-width: 160px;
+                max-height: 250px;
+                overflow-y: auto;
+                animation: fadeInScale 0.2s ease-out;
+              `;
+              
+              const options = googleSelect.querySelectorAll('option');
+              options.forEach((option, index) => {
+                if (index === 0) return;
+                
+                const optionDiv = document.createElement('div');
+                optionDiv.textContent = option.textContent;
+                optionDiv.style.cssText = `
+                  padding: 12px 16px;
+                  cursor: pointer;
+                  font-size: 15px;
+                  color: #333;
+                  border-bottom: 1px solid #f0f0f0;
+                  transition: all 0.2s ease;
+                `;
+                
+                optionDiv.addEventListener('mouseenter', () => {
+                  optionDiv.style.background = 'linear-gradient(135deg, #46b57f, #46b5a7)';
+                  optionDiv.style.color = 'white';
+                  optionDiv.style.transform = 'translateX(4px)';
+                });
+                
+                optionDiv.addEventListener('mouseleave', () => {
+                  optionDiv.style.background = 'white';
+                  optionDiv.style.color = '#333';
+                  optionDiv.style.transform = 'translateX(0)';
+                });
+                
+                optionDiv.addEventListener('click', () => {
+                  googleSelect.value = option.value;
+                  
+                  const changeEvent = new Event('change', { bubbles: true });
+                  googleSelect.dispatchEvent(changeEvent);
+                  
+                  // Safe removal with null checks
+                  if (customDropdown && customDropdown.parentNode) {
+                    customDropdown.remove();
+                  }
+                  customDropdown = null;
+                });
+                
+                customDropdown.appendChild(optionDiv);
+              });
+              
+              document.body.appendChild(customDropdown);
+              
+              const handleClickOutside = (event) => {
+                if (customDropdown && customDropdown.parentNode && !customDropdown.contains(event.target) && !mobileTranslateBtn.contains(event.target)) {
+                  customDropdown.remove();
+                  customDropdown = null;
+                  document.removeEventListener('click', handleClickOutside);
+                } else if (!customDropdown) {
+                  document.removeEventListener('click', handleClickOutside);
+                }
+              };
+              
+              setTimeout(() => {
+                document.addEventListener('click', handleClickOutside);
+              }, 100);
+              
+            } else {
+              setTimeout(() => {
+                mobileTranslateBtn.click();
+              }, 500);
+            }
+          });
+        }
+      }, 1000);
+    };
+
+    const hideBanner = () => {
+      const banner = document.querySelector(".goog-te-banner-frame");
+      if (banner) banner.style.display = "none";
+      document.body.style.top = "0px";
+    };
+
+    return () => {
+      if (document.body.contains(script)) {
+        document.body.removeChild(script);
+      }
+    };
+  }, [isClient]);
 
   // Check authentication
   useEffect(() => {
+    if (!isClient) return; // Only run on client side
+    
     const checkAuth = () => {
       const adminLoggedIn = localStorage.getItem('adminLoggedIn');
       if (adminLoggedIn === 'true') {
@@ -44,18 +241,17 @@ export default function AdminDashboard() {
     };
 
     checkAuth();
-  }, [router]);
+  }, [router, isClient]);
 
   // Fetch users from Firebase
   useEffect(() => {
-    if (!isAuthenticated) return; // Don't fetch data until authenticated
+    if (!isAuthenticated) return;
     
     const fetchUsers = async () => {
       try {
         setLoading(true);
         setError(null);
         
-        // Real-time listener for users collection
         const unsubscribe = onSnapshot(
           collection(db, 'users'), 
           (snapshot) => {
@@ -63,7 +259,6 @@ export default function AdminDashboard() {
             snapshot.forEach((doc) => {
               const userData = { uid: doc.id, ...doc.data() };
               
-              // Convert Firebase timestamp to JavaScript Date if needed
               if (userData.createdAt && userData.createdAt.toDate) {
                 userData.createdAt = userData.createdAt.toDate().toISOString();
               }
@@ -71,7 +266,6 @@ export default function AdminDashboard() {
               usersData.push(userData);
             });
             
-            // Sort by creation date (newest first)
             usersData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
             
             setUsers(usersData);
@@ -84,26 +278,7 @@ export default function AdminDashboard() {
           }
         );
 
-        // Cleanup subscription
-        const handleLogout = () => {
-    localStorage.removeItem('adminLoggedIn');
-    document.cookie = 'adminLoggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    router.push('/login');
-  };
-
-  // Show loading screen while checking authentication
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <RefreshCw className="h-8 w-8 text-green-600 animate-spin" />
-          <span className="text-gray-600">Checking authentication...</span>
-        </div>
-      </div>
-    );
-  }
-
-  return () => unsubscribe();
+        return () => unsubscribe();
       } catch (error) {
         console.error('Error setting up users listener:', error);
         setError('Failed to connect to Firebase. Please check your configuration.');
@@ -113,6 +288,26 @@ export default function AdminDashboard() {
 
     fetchUsers();
   }, [isAuthenticated]);
+
+  const handleLogout = () => {
+    localStorage.removeItem('adminLoggedIn');
+    document.cookie = 'adminLoggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    router.push('/login');
+  };
+
+  // Show loading screen while checking authentication or during hydration
+  if (!isClient || (!isAuthenticated && isClient)) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <RefreshCw className="h-8 w-8 text-green-600 animate-spin" />
+          <span className="text-gray-600">
+            {!isClient ? 'Loading...' : 'Checking authentication...'}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   const stats = {
     totalUsers: users.length,
@@ -197,22 +392,42 @@ export default function AdminDashboard() {
     document.body.removeChild(link);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('adminLoggedIn');
-    document.cookie = 'adminLoggedIn=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-    router.push('/login');
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Google Translate Elements */}
+      <div className="translate-micro" style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 9999, display: 'none' }}>
+        <div
+          id="google_translate_element"
+          className="translate-icon"
+        ></div>
+        <div className="custom-translate-btn" title="Translate">
+          🌐
+        </div>
+      </div>
+
+      {/* Mobile Translate Button */}
+      <div className="mobile-translate-btn" style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 9999 }} title="Translate">
+        🌐
+      </div>
+
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
+              {/* Logo */}
+              <Link href="https://agriconnectwebapp.netlify.app/" passHref>
+                <div className="cursor-pointer">
+                  <Image
+                    src="/Images/Logo/Agriconnect_logo.png"
+                    alt="AgriConnect Logo"
+                    width={160}
+                    height={80}
+                    priority
+                  />
+                </div>
+              </Link>
               <div className="flex items-center space-x-2">
-                <Sprout className="h-8 w-8 text-green-600" />
-                <span className="text-xl font-bold text-gray-900">AgriConnect</span>
                 <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded-full">Admin Panel</span>
               </div>
             </div>
@@ -539,6 +754,139 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      {/* Translate Button Styles */}
+      <style jsx global>{`
+        .translate-micro {
+          position: relative;
+          margin: 0 8px;
+          display: inline-block;
+          width: 20px;
+          height: 20px;
+        }
+        
+        /* Hide Google branding but keep dropdown functional */
+        .goog-te-gadget > span > a,
+        .goog-te-gadget .goog-logo-link,
+        .goog-te-gadget span:first-child,
+        .goog-te-banner-frame,
+        .goog-te-banner-frame.skiptranslate {
+          display: none !important;
+        }
+        
+        .goog-te-gadget {
+          font-size: 0 !important;
+          line-height: 0 !important;
+        }
+        
+        /* Style the actual Google dropdown */
+        .goog-te-combo {
+          position: absolute !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+          width: 20px !important;
+          height: 20px !important;
+          top: 0 !important;
+          left: 0 !important;
+          z-index: 1 !important;
+        }
+        
+        /* Custom translate button overlay */
+        .custom-translate-btn {
+          display: flex !important;
+          align-items: center;
+          justify-content: center;
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          cursor: pointer;
+          font-size: 16px;
+          transition: all 0.2s ease;
+          position: absolute;
+          top: 0;
+          left: 0;
+          z-index: 5;
+          pointer-events: auto;
+        }
+        
+        .custom-translate-btn:active {
+          transform: scale(0.95);
+        }
+        
+        /* When dropdown is opened, show it */
+        .translate-micro.open .goog-te-combo {
+          opacity: 1 !important;
+          pointer-events: auto !important;
+          position: absolute !important;
+          top: 25px !important;
+          left: -20px !important;
+          width: auto !important;
+          height: auto !important;
+          background: white !important;
+          border: 1px solid #ccc !important;
+          border-radius: 4px !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+          z-index: 1000 !important;
+        }
+        
+        .translate-micro.open .goog-te-combo option {
+          padding: 4px 8px !important;
+          font-size: 12px !important;
+          color: #333 !important;
+        }
+
+        /* Mobile translate button */
+        .mobile-translate-btn {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 40px;
+          height: 40px;
+          font-size: 20px;
+          cursor: pointer;
+          border-radius: 10px;
+          background: #f4f8f6;
+          border: 2px solid #004e16;
+          color: #004e16;
+          box-shadow: 0 4px 15px rgba(70, 181, 127, 0.4);
+          position: relative;
+        }
+
+        .mobile-translate-btn:active {
+          transform: scale(0.95);
+        }
+
+        /* Custom dropdown animation */
+        @keyframes fadeInScale {
+          0% {
+            opacity: 0;
+            transform: scale(0.9) translateY(-10px);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+
+        /* Custom scrollbar for mobile dropdown */
+        .custom-mobile-dropdown::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .custom-mobile-dropdown::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 3px;
+        }
+
+        .custom-mobile-dropdown::-webkit-scrollbar-thumb {
+          background: #46b57f;
+          border-radius: 3px;
+        }
+
+        .custom-mobile-dropdown::-webkit-scrollbar-thumb:hover {
+          background: #004e16;
+        }
+      `}</style>
     </div>
   );
 }
